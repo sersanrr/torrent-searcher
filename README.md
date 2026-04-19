@@ -4,7 +4,7 @@ A web application to search torrents across multiple trackers with a clean, mode
 
 ## Features
 
-- 🌐 Multi-tracker search (1337x, NYAA, YTS)
+- 🌐 Multi-tracker search (1337x, NYAA, YTS, RuTor, NNMClub)
 - 🔍 Clean, responsive frontend with card-based results
 - 🚀 Node.js backend with TypeScript
 - 🌍 Proxy support for bypassing tracker blocks
@@ -113,8 +113,8 @@ Check server health and tracker availability.
 {
   "status": "ok",
   "trackers": {
-    "total": 3,
-    "available": 2
+    "total": 5,
+    "available": 3
   },
   "proxies": {
     "enabled": false
@@ -137,6 +137,18 @@ Get list of enabled trackers and their status.
     {
       "name": "NYAA",
       "available": true
+    },
+    {
+      "name": "YTS",
+      "available": false
+    },
+    {
+      "name": "RuTor",
+      "available": true
+    },
+    {
+      "name": "NNMClub",
+      "available": true
     }
   ]
 }
@@ -144,20 +156,18 @@ Get list of enabled trackers and their status.
 
 ## Configuration
 
-### Add or configure trackers
 
-Edit `server/src/config/trackers.ts`:
 
-```typescript
-export const TRACKER_CONFIGS: TrackerConfig[] = [
-  {
-    name: 'Your Tracker',
-    baseUrl: 'https://tracker.example.com',
-    searchPath: '/search/',
-    enabled: true,
-    requiresProxy: false,
-  },
-];
+**Tracker Status:**
+| Tracker | Base URL | Requires Proxy | Language |
+|---------|----------|---------------|----------|
+| 1337x | https://1337x.to | ✅ | English |
+| NYAA | https://nyaa.si | ❌ | English |
+| YTS | https://yts.mx | ❌ | English |
+| RuTor | https://rutor.is | ✅ | Russian |
+| NNMClub | https://nnmclub.to | ✅ | Russian |
+
+**Note:** RuTor and NNMClub require proxy/VPN for access due to blocking patterns. NNMClub additionally requires authentication.
 ```
 
 ### Set up proxy
