@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { TorrentFile, TrackerConfig } from '../types';
+import https from 'https';
 
 export class TrackerParser {
   private config: TrackerConfig;
@@ -30,6 +31,9 @@ export class TrackerParser {
           'Accept-Language': 'en-US,en;q=0.5',
         },
         timeout: 15000,
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false,
+        }),
       });
 
       return this.parseSearchResults(response.data, this.config.name);
@@ -140,6 +144,9 @@ export class TrackerParser {
           const response = await axios.get(apiUrl, {
             headers: { 'User-Agent': this.userAgent },
             timeout: 10000,
+            httpsAgent: new https.Agent({
+              rejectUnauthorized: false,
+            }),
           });
           
           const results: TorrentFile[] = [];
