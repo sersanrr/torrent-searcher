@@ -301,12 +301,14 @@ export class TrackerParser {
 
   /**
    * Check if the tracker is available
+   * NOTE: Many trackers don't respond well to HEAD/GET on baseUrl.
+   * We assume availability and let search() handle failures.
    */
   async checkAvailability(): Promise<boolean> {
     try {
       const config = {
         headers: { 'User-Agent': this.userAgent },
-        timeout: 8000, // Increased from 5000ms
+        timeout: 5000,
       };
       
       // For YTS, check API endpoint directly
@@ -315,12 +317,19 @@ export class TrackerParser {
         return response.status === 200;
       }
       
-      await axios.get(this.config.baseUrl, config);
+      // For RuTor, check main page or search (availability may vary)
+      if (this.config.name === 'RuTor') {
+        const response = await axios.get(`${this.config.baseUrl}/`, config);
+        return response.status === 200;
+      }
+      
+      // For other trackers, assume available (let search() handle errors)
+      // Many trackers block direct baseUrl requests but search works fine
       return true;
     } catch (error) {
       console.error(`Availability check failed for ${this.config.name}:`, error instanceof Error ? error.message : 'Unknown error');
-      // Returns false but still allows search attempts
-      return false;
+      // Don't mark as unavailable - try search anyway
+      return true;
     }
   }
 }
