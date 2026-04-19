@@ -56,6 +56,10 @@ export class TrackerParser {
         return this.parseNYAA($, source);
       case 'YTS':
         return this.parseYTS($, source);
+      case 'RuTor':
+        return this.parseRuTor($, source);
+      case 'NNMClub':
+        return this.parseNNMClub($, source);
       default:
         console.error(`Unknown tracker: ${source}`);
         return [];
@@ -178,6 +182,81 @@ export class TrackerParser {
     return [];
   }
 
+  private parseRuTor($: any, source: string): TorrentFile[] {
+    const results: TorrentFile[] = [];
+    $('table#index tr').slice(1).each((index: number, element: any) => {
+      try {
+        const $row = $(element);
+        const $titleCell = $row.find('td:nth-child(2)');
+        const $link = $titleCell.find('a').first();
+        if ($link.length === 0) return;
+        
+        const title = $link.text().trim();
+        const href = $link.attr('href');
+        const id = href?.split('/').pop()?.split('.')[0] || String(index);
+        
+        // Extract magnet link
+        const $magnet = $row.find('td:nth-child(3) a[href^="magnet:"]');
+        const magnet = $magnet.attr('href') || '';
+        
+        // Extract size (usually in second column)
+        const $sizeCell = $row.find('td:nth-child(2)');
+        const sizeMatch = $sizeCell.text().match(/([\d.]+\s*[GMKB]B)/i);
+        const size = sizeMatch ? sizeMatch[1] : 'Unknown';
+        
+        // Extract seeders and leechers (usually in columns)
+        const cells = $row.find('td');
+        const seeders = parseInt($(cells[3]).text()) || 0;
+        const leechers = parseInt($(cells[4]).text()) || 0;
+        
+        if (title) {
+          results.push({ id, title, size, seeders, leechers, magnet, source });
+        }
+      } catch (error) {
+        console.error('Error parsing RuTor row:', error);
+      }
+    });
+    return results;
+  }
+
+  private parseNNMClub($: any, source: string): TorrentFile[] {
+    const results: TorrentFile[] = [];
+    // NNMClub requires authentication, this is a generic parser for the search result table
+    $('table.tor-table tr').slice(1).each((index: number, element: any) => {
+      try {
+        const $row = $(element);
+        const $titleCell = $row.find('td.t-title');
+        const $link = $titleCell.find('a.tLink').first();
+        if ($link.length === 0) return;
+        
+        const title = $link.text().trim();
+        const href = $link.attr('href');
+        const id = href?.split('=').pop() || String(index);
+        
+        // Extract magnet link (usually a different format)
+        const $magnet = $row.find('a[href^="magnet:"]');
+        const magnet = $magnet.attr('href') || '';
+        
+        // Extract size (usually in tSize cell)
+        const $sizeCell = $row.find('td.t-size');
+        const size = $sizeCell.text().trim();
+        
+        // Extract seeders and leechers
+        const $seedersCell = $row.find('td.t-s-seed b');
+        const $leechersCell = $row.find('td.t-s-leech b');
+        const seeders = parseInt($seedersCell.text()) || 0;
+        const leechers = parseInt($leechersCell.text()) || 0;
+        
+        if (title) {
+          results.push({ id, title, size, seeders, leechers, magnet, source });
+        }
+      } catch (error) {
+        console.error('Error parsing NNMClub row:', error);
+      }
+    });
+    return results;
+  }
+
   /**
    * Build search URL for the tracker
    */
@@ -193,6 +272,11 @@ export class TrackerParser {
         return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}${pageParamNYAA}`;
       case 'YTS':
         return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}`;
+      case 'RuTor':
+        const pageParamRuTor = page > 1 ? `&page=${page}` : '';
+        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}${pageParamRuTor}`;
+      case 'NNMClub':
+        return `${this.config.baseUrl}?nm=${encodedQuery}`;
       default:
         return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}`;
     }

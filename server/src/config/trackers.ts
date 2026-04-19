@@ -26,6 +26,20 @@ export const TRACKER_CONFIGS: TrackerConfig[] = [
     enabled: true,
     requiresProxy: false,
   },
+  {
+    name: 'RuTor',
+    baseUrl: 'https://rutor.is',
+    searchPath: '/search/',
+    enabled: true,
+    requiresProxy: true, // Often blocked without proxy
+  },
+  {
+    name: 'NNMClub',
+    baseUrl: 'https://nnmclub.to',
+    searchPath: '/forum/tracker.php',
+    enabled: true,
+    requiresProxy: true, // Requires authentication/proxy for access
+  },
 ];
 
 /**
