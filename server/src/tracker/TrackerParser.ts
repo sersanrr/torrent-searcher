@@ -1,0 +1,225 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { TorrentFile, TrackerConfig } from '../types';
+
+export class TrackerParser {
+  private config: TrackerConfig;
+  private userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  constructor(config: TrackerConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Search torrents on the tracker
+   */
+  async search(query: string, page: number = 1): Promise<TorrentFile[]> {
+    // YTS uses API directly
+    if (this.config.name === 'YTS') {
+      return this.searchYTS(query, page);
+    }
+    
+    try {
+      const url = this.buildSearchUrl(query, page);
+      console.log(`Searching ${this.config.name}: ${url}`);
+      
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': this.userAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+        },
+        timeout: 15000,
+      });
+
+      return this.parseSearchResults(response.data, this.config.name);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error(`Search error for ${this.config.name}:`, error.message);
+      }
+      return [];
+    }
+  }
+
+  /**
+   * Parse HTML response and extract torrent information
+   */
+  private parseSearchResults(html: string, source: string): TorrentFile[] {
+    const $ = cheerio.load(html);
+    const results: TorrentFile[] = [];
+
+    // Route to tracker-specific parser
+    switch (source) {
+      case '1337x':
+        return this.parse1337x($, source);
+      case 'NYAA':
+        return this.parseNYAA($, source);
+      case 'YTS':
+        return this.parseYTS($, source);
+      default:
+        console.error(`Unknown tracker: ${source}`);
+        return [];
+    }
+  }
+
+  private parse1337x($: any, source: string): TorrentFile[] {
+    const results: TorrentFile[] = [];
+    $('.table-list tbody tr').each((index: number, element: any) => {
+      try {
+        const $row = $(element);
+        const $link = $row.find('td.name a:nth-child(2)');
+        const title = $link.text().trim();
+        const href = $link.attr('href');
+        const id = href?.split('/')[1] || '';
+        const $magnet = $row.find('td a[href^="magnet:"]');
+        const magnet = $magnet.attr('href') || '';
+        const $seeders = $row.find('td.seeds');
+        const $leechers = $row.find('td.leeches');
+        const seeders = parseInt($seeders.text()) || 0;
+        const leechers = parseInt($leechers.text()) || 0;
+        const $size = $row.find('td.size');
+        const size = $size.text().trim();
+        if (title && magnet) {
+          results.push({ id, title, size, seeders, leechers, magnet, source });
+        }
+      } catch (error) {
+        console.error('Error parsing 1337x row:', error);
+      }
+    });
+    return results;
+  }
+
+  private parseNYAA($: any, source: string): TorrentFile[] {
+    const results: TorrentFile[] = [];
+    $('tr').slice(1).each((index: number, element: any) => {
+      try {
+        const $row = $(element);
+        const $link = $row.find('.torrent-name a');
+        if ($link.length === 0) return;
+        const title = $link.text().trim();
+        const href = $link.attr('href');
+        const id = href?.split('=')[1] || String(index);
+        const $magnet = $row.find('td a[href^="magnet:"]');
+        const magnet = $magnet.attr('href') || '';
+        const $stats = $row.find('td.col-2');
+        if ($stats.length >= 2) {
+          const stats = $stats.map((i: number, el: any) => parseInt($(el).text())).get();
+          const seeders = stats[0] || 0;
+          const leechers = stats[1] || 0;
+          const sizeCell = $row.find('td.col-size');
+          const size = sizeCell.text().trim();
+          if (title) {
+            results.push({ id, title, size, seeders, leechers, magnet, source });
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing NYAA row:', error);
+      }
+    });
+    return results;
+  }
+
+  private async searchYTS(query: string, page: number = 1): Promise<TorrentFile[]> {
+    try {
+      // Try multiple API endpoints if DNS blocking
+      const apiEndpoints = [
+        'https://yts.mx/api/v2/list_movies.json',
+        'https://yts.yt/api/v2/list_movies.json',
+        'https://ytstapi.xyz/api/v2/list_movies.json',
+      ];
+      
+      for (const baseUrl of apiEndpoints) {
+        try {
+          const apiUrl = `${baseUrl}?query_term=${encodeURIComponent(query)}&page=${page}`;
+          console.log(`Trying YTS API: ${apiUrl}`);
+          
+          const response = await axios.get(apiUrl, {
+            headers: { 'User-Agent': this.userAgent },
+            timeout: 10000,
+          });
+          
+          const results: TorrentFile[] = [];
+          
+          if (response.data.data && response.data.data.movies) {
+            for (const movie of response.data.data.movies) {
+              if (!movie.torrents) continue;
+              
+              for (const torrent of movie.torrents) {
+                results.push({
+                  id: String(movie.id),
+                  title: `${movie.title} (${torrent.quality})`,
+                  size: torrent.size || 'Unknown',
+                  seeders: torrent.seeds || 0,
+                  leechers: torrent.peers || 0,
+                  magnet: torrent.url || '',
+                  source: 'YTS',
+                  date: movie.year ? String(movie.year) : undefined,
+                });
+              }
+            }
+            console.log(`YTS found ${results.length} results`);
+            return results;
+          }
+        } catch (err) {
+          console.log(`Failed to reach ${baseUrl}`);
+          continue;
+        }
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('YTS API search error:', error);
+      return [];
+    }
+  }
+  
+  private parseYTS($: any, source: string): TorrentFile[] {
+    // Deprecated: YTS now uses API directly
+    return [];
+  }
+
+  /**
+   * Build search URL for the tracker
+   */
+  private buildSearchUrl(query: string, page: number): string {
+    const encodedQuery = encodeURIComponent(query);
+    
+    switch (this.config.name) {
+      case '1337x':
+        const pageParam1337x = page > 1 ? `/${page}/` : '/';
+        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}${pageParam1337x}`;
+      case 'NYAA':
+        const pageParamNYAA = page > 1 ? `&p=${page}` : '';
+        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}${pageParamNYAA}`;
+      case 'YTS':
+        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}`;
+      default:
+        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}`;
+    }
+  }
+
+  /**
+   * Check if the tracker is available
+   */
+  async checkAvailability(): Promise<boolean> {
+    try {
+      const config = {
+        headers: { 'User-Agent': this.userAgent },
+        timeout: 8000, // Increased from 5000ms
+      };
+      
+      // For YTS, check API endpoint directly
+      if (this.config.name === 'YTS') {
+        const response = await axios.get(`${this.config.baseUrl}/api/v2/list_movies.json`, config);
+        return response.status === 200;
+      }
+      
+      await axios.get(this.config.baseUrl, config);
+      return true;
+    } catch (error) {
+      console.error(`Availability check failed for ${this.config.name}:`, error instanceof Error ? error.message : 'Unknown error');
+      // Returns false but still allows search attempts
+      return false;
+    }
+  }
+}

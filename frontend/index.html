@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torrent Searcher</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">🔍 Torrent Searcher</h1>
+            <p class="subtitle">Search torrents across multiple trackers</p>
+        </header>
+
+        <main class="main">
+            <div class="search-section">
+                <form id="search-form" class="search-form">
+                    <div class="search-wrapper">
+                        <input
+                            type="text"
+                            id="search-input"
+                            placeholder="Search torrents..."
+                            class="search-input"
+                            autocomplete="off"
+                            required
+                            minlength="2"
+                        >
+                        <button type="submit" class="search-button" id="search-btn">
+                            Search
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="status-bar" id="status-bar" style="display: none;">
+                <span class="status-text" id="status-text"></span>
+                <button class="status-close" id="status-close">×</button>
+            </div>
+
+            <div class="results-section" id="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2 class="results-title" id="results-title">Results</h2>
+                    <div class="results-info" id="results-info"></div>
+                </div>
+
+                <div class="results-grid" id="results-grid">
+                    <!-- Results will be inserted here -->
+                </div>
+            </div>
+
+            <div class="section" id="trackers-section">
+                <div class="section-header">
+                    <h2 class="section-title">Available Trackers</h2>
+                </div>
+                <div class="trackers-list" id="trackers-list">
+                    <!-- Trackers will be loaded here -->
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>⚠️ Use responsibly. Respect copyright laws.</p>
+        </footer>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>
