@@ -184,32 +184,49 @@ export class TrackerParser {
 
   private parseRuTor($: any, source: string): TorrentFile[] {
     const results: TorrentFile[] = [];
-    $('table#index tr').slice(1).each((index: number, element: any) => {
+    $('#index table tr').slice(1).each((index: number, element: any) => {
       try {
         const $row = $(element);
-        const $titleCell = $row.find('td:nth-child(2)');
-        const $link = $titleCell.find('a').first();
-        if ($link.length === 0) return;
+        const $cells = $row.find('td');
         
-        const title = $link.text().trim();
-        const href = $link.attr('href');
-        const id = href?.split('/').pop()?.split('.')[0] || String(index);
+        if ($cells.length < 3) return; // Skip incomplete rows
         
-        // Extract magnet link
-        const $magnet = $row.find('td:nth-child(3) a[href^="magnet:"]');
+        // Find magnet link in first cell with titles
+        const $cell1 = $($cells[0]);
+        const $magnet = $cell1.find('a[href^="magnet:"]');
         const magnet = $magnet.attr('href') || '';
         
-        // Extract size (usually in second column)
-        const $sizeCell = $row.find('td:nth-child(2)');
-        const sizeMatch = $sizeCell.text().match(/([\d.]+\s*[GMKB]B)/i);
-        const size = sizeMatch ? sizeMatch[1] : 'Unknown';
+        // Find title link (last link in the cell)
+        const $titleLink = $cell1.find('a[href^="/torrent/"]').last();
+        if ($titleLink.length === 0) return;
         
-        // Extract seeders and leechers (usually in columns)
-        const cells = $row.find('td');
-        const seeders = parseInt($(cells[3]).text()) || 0;
-        const leechers = parseInt($(cells[4]).text()) || 0;
+        const title = $titleLink.text().trim();
+        const href = $titleLink.attr('href');
+        const id = href?.split('/').pop() || String(index);
         
-        if (title) {
+        // Extract size from table (usually second or third column)
+        let size = 'Unknown';
+        for (let i = 1; i < $cells.length; i++) {
+          const cellText = $($cells[i]).text().trim();
+          const sizeMatch = cellText.match(/([\d.]+\s*[GMKB]B)/i);
+          if (sizeMatch) {
+            size = sizeMatch[1];
+            break;
+          }
+        }
+        
+        // Extract seeders and leechers (green/red spans in centered cell)
+        let seeders = 0;
+        let leechers = 0;
+        const $piratesCell = $row.find('td:has(span.green)');
+        if ($piratesCell.length > 0) {
+          const greenText = $piratesCell.find('span.green').text().replace(/[^\d]/g, '');
+          const redText = $piratesCell.find('span.red').text().replace(/[^\d]/g, '');
+          seeders = parseInt(greenText) || 0;
+          leechers = parseInt(redText) || 0;
+        }
+        
+        if (title && magnet) {
           results.push({ id, title, size, seeders, leechers, magnet, source });
         }
       } catch (error) {
@@ -273,8 +290,8 @@ export class TrackerParser {
       case 'YTS':
         return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}`;
       case 'RuTor':
-        const pageParamRuTor = page > 1 ? `&page=${page}` : '';
-        return `${this.config.baseUrl}${this.config.searchPath}${encodedQuery}${pageParamRuTor}`;
+        // RuTor uses direct URL without encoding: /search/query
+        return `${this.config.baseUrl}${this.config.searchPath}${query}`;
       case 'NNMClub':
         return `${this.config.baseUrl}?nm=${encodedQuery}`;
       default:
